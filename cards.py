@@ -5,6 +5,10 @@ import matplotlib.pyplot as plt
 from cv2 import cv2
 from skimage.filters import threshold_local, threshold_adaptive
 import os
+import warnings
+import time
+
+warnings.filterwarnings("ignore")
 
 def order_points(pts):
 	rect = np.zeros((4, 2), dtype = "float32")
@@ -36,8 +40,7 @@ def four_point_transform(image, pts):
     
 def proccess_card(image):
     image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    image = threshold_adaptive(image, 251, offset=10)
-    image = image.astype("uint8") * 255
+    ret, image = cv2.threshold(image, 127, 255, cv2.THRESH_BINARY)
     dim = (245, 343)
     image = cv2.resize(image, dim, interpolation = cv2.INTER_AREA)
     return image
@@ -52,20 +55,41 @@ def detect_cards(image):
     return cnts
     
     
-def create_labeled_images():
+def create_labeled_cards():
     image = cv2.imread('data/sample/all_cards.jpg')
     cnts = detect_cards(image)[:120]
     for i, c in enumerate(cnts):
         peri = cv2.arcLength(c, True)
-        approx = cv2.approxPolyDP(c, 0.02 * peri, True)
+        approx = cv2.approxPolyDP(c, 0.02*peri, True)
         if len(approx) == 4:
             warped = four_point_transform(image, approx.reshape(4, 2))
             card = proccess_card(warped)
             cv2.imwrite('data/labeled_2/card_{}.png'.format(i), card)
-        
-def get_labled_images():
+
+def create_labeled_corners():
+    image = cv2.imread('data/sample/all_cards.jpg')
+    cnts = detect_cards(image)[:130]
+    for i_card, c in enumerate(cnts):
+        peri = cv2.arcLength(c, True)
+        approx = cv2.approxPolyDP(c, 0.02 * peri, True)
+        if len(approx) == 4:
+            input_card = four_point_transform(image, approx.reshape(4, 2))
+            input_card = proccess_card(input_card)
+            cv2.imwrite('data/labeled_top_left/card_{}.png'.format(i_card), input_card[5:90,:35])
+    
+def get_labled_cards():
     labled = {}
     loc = 'data/labeled_2/'
+    for file in os.listdir(loc):
+        if file.endswith('.png'):
+            warped = cv2.imread(loc + file)
+            card = proccess_card(warped)
+            labled[file.split('.')[0]] = card
+    return labled
+
+def get_labled_top_left():
+    labled = {}
+    loc = 'data/labeled_top_left/'
     for file in os.listdir(loc):
         if file.endswith('.png'):
             warped = cv2.imread(loc + file)
@@ -80,14 +104,15 @@ def calc_difference(image_1, image_2):
     diff = cv2.GaussianBlur(diff,(5,5),5)    
     flag, diff_1 = cv2.threshold(diff, 200, 255, cv2.THRESH_BINARY)
     return np.sum(diff)
+
+def top_left_detection(image):
     
 
-def image_difference():
-    labled = get_labled_images()
-    image = cv2.imread('data/sample/all_cards.jpg')
-    cnts = detect_cards(image)[:10]
+def whole_card_detection(image):
+    labled = get_labled_cards()
+    cnts = detect_cards(image)[:5]
     results = {}
-    for i, c in enumerate(cnts):
+    for i_card, c in enumerate(cnts):
         peri = cv2.arcLength(c, True)
         approx = cv2.approxPolyDP(c, 0.02 * peri, True)
         if len(approx) == 4:
@@ -102,16 +127,18 @@ def image_difference():
                 diff_1 = calc_difference(input_card, label_card)
                 diff_2 = calc_difference(input_card_rotated, label_card)  
                 diffs[label_name] = min(diff_1, diff_2)
-            results[i] = min(diffs, key=diffs.get)
-            cv2.imshow('input_card_{}'.format(i), input_card)
+            results[i_card] = min(diffs, key=diffs.get)
+            cv2.imshow('input_card_{}'.format(i_card), input_card)
     return results
-    
+
 if __name__ == '__main__':
-    results = image_difference()
-    print(results)
     
+# =============================================================================
+#     results = card_detection(cv2.imread('data/sample/all_cards.jpg'))
+#     print(results)
+# =============================================================================
     
-    
+
     
     
     

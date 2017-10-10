@@ -1,4 +1,9 @@
 
+# **Playing Card Detection with OpenCV**
+
+Learning how to use open computer vision by detecting playing cards on a table with a variety of algorithms...
+
+<img src='sample/all_cards.png'>
 
 * get data
     *
