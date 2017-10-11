@@ -52,6 +52,7 @@ def detect_cards(image):
     # cv2.imshow('edged', edged)
     (_, cnts, _) = cv2.findContours(edged.copy(), cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
     cnts = sorted(cnts, key = cv2.contourArea, reverse = True)
+    cv2.drawContours(image, cnts[:105], -1, (0, 255, 0), 4)
     return cnts
     
     
@@ -77,40 +78,57 @@ def create_labeled_corners():
             input_card = proccess_card(input_card)
             cv2.imwrite('data/labeled_top_left/card_{}.png'.format(i_card), input_card[5:90,:35])
     
-def get_labled_cards():
-    labled = {}
+def get_labeled_cards():
+    labeled = {}
     loc = 'data/labeled_2/'
     for file in os.listdir(loc):
         if file.endswith('.png'):
             warped = cv2.imread(loc + file)
             card = proccess_card(warped)
-            labled[file.split('.')[0]] = card
-    return labled
+            labeled[file.split('.')[0]] = card
+    return labeled
 
-def get_labled_top_left():
-    labled = {}
+
+def get_labeled_top_left():
+    labeled = {}
     loc = 'data/labeled_top_left/'
     for file in os.listdir(loc):
         if file.endswith('.png'):
             warped = cv2.imread(loc + file)
             card = proccess_card(warped)
-            labled[file.split('.')[0]] = card
-    return labled
+            labeled[file.split('.')[0]] = card
+    return labeled
 
 def calc_difference(image_1, image_2):
     image_1 = cv2.GaussianBlur(image_1,(5,5),5)
     image_2 = cv2.GaussianBlur(image_2,(5,5),5)
     diff = cv2.absdiff(image_1, image_2)
     diff = cv2.GaussianBlur(diff,(5,5),5)    
-    flag, diff_1 = cv2.threshold(diff, 200, 255, cv2.THRESH_BINARY)
+    flag, diff = cv2.threshold(diff, 127, 255, cv2.THRESH_BINARY)
     return np.sum(diff)
 
 def top_left_detection(image):
+    '''
+    wip
+    '''
+    labeled = get_labeled_top_left()
+    image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    ret, image = cv2.threshold(image, 127, 255, cv2.THRESH_BINARY)
+    dim = (245, 343)
+    image = cv2.resize(image, dim, interpolation = cv2.INTER_AREA)
+    cv2.imshow('raw', image)
+    return labeled
     
-
+def center_of_contour(cnts):
+    M = cv2.moments(cnts)
+    cX = int(M['m10'] / M['m00'])
+    cY = int(M['m01'] / M['m00'])
+    return cX, cY
+    
+    
 def whole_card_detection(image):
-    labled = get_labled_cards()
-    cnts = detect_cards(image)[:5]
+    labeled = get_labeled_cards()
+    cnts = detect_cards(image)[:105]
     results = {}
     for i_card, c in enumerate(cnts):
         peri = cv2.arcLength(c, True)
@@ -123,20 +141,22 @@ def whole_card_detection(image):
             M = cv2.getRotationMatrix2D(center, 180, 1.0)
             input_card_rotated = cv2.warpAffine(input_card, M, (w, h))
             diffs = {}
-            for label_name, label_card in labled.items():
+            for label_name, label_card in labeled.items():
                 diff_1 = calc_difference(input_card, label_card)
                 diff_2 = calc_difference(input_card_rotated, label_card)  
                 diffs[label_name] = min(diff_1, diff_2)
             results[i_card] = min(diffs, key=diffs.get)
-            cv2.imshow('input_card_{}'.format(i_card), input_card)
+    for i_card, card_label in results.items():
+        x, y = center_of_contour(cnts[i_card])
+        cv2.putText(image, card_label, (x-110, y+20), cv2.FONT_HERSHEY_SIMPLEX, 4, (0, 255, 0), 10)
+    cv2.imwrite('imgs/test.png', image)
     return results
 
 if __name__ == '__main__':
     
-# =============================================================================
-#     results = card_detection(cv2.imread('data/sample/all_cards.jpg'))
-#     print(results)
-# =============================================================================
+    
+    results = whole_card_detection(cv2.imread('data/sample/all_cards.jpg'))
+    print(results)
     
 
     
