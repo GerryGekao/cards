@@ -150,7 +150,7 @@ def whole_card_detection(image):
     for i_card, card_label in results.items():
         x, y = center_of_contour(cnts[i_card])
         cv2.putText(image, card_label, (x-110, y+20), cv2.FONT_HERSHEY_SIMPLEX, 4, (0, 255, 0), 10)
-    cv2.imwrite('imgs/test.png', image)
+    cv2.imwrite('imgs/labeled.png', image)
     return results
 
 if __name__ == '__main__':
