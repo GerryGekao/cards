@@ -53,6 +53,7 @@ def detect_cards(image):
     (_, cnts, _) = cv2.findContours(edged.copy(), cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
     cnts = sorted(cnts, key = cv2.contourArea, reverse = True)
     cv2.drawContours(image, cnts[:105], -1, (0, 255, 0), 4)
+    cv2.imwrite('imgs/cards_detected.png', image)
     return cnts
     
     
