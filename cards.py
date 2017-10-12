@@ -45,16 +45,26 @@ def proccess_card(image):
     image = cv2.resize(image, dim, interpolation = cv2.INTER_AREA)
     return image
 
+def proccess_top_left(image):
+    image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    ret, image = cv2.threshold(image, 127, 255, cv2.THRESH_BINARY)
+    dim = (35, 85)
+    image = cv2.resize(image, dim, interpolation = cv2.INTER_AREA)
+    return image
+
 def detect_cards(image):
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     gray = cv2.GaussianBlur(gray, (5, 5), 0)
     edged = cv2.Canny(gray, 75, 200)
-    # cv2.imshow('edged', edged)
     (_, cnts, _) = cv2.findContours(edged.copy(), cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
     cnts = sorted(cnts, key = cv2.contourArea, reverse = True)
-    cv2.drawContours(image, cnts[:105], -1, (0, 255, 0), 4)
-    cv2.imwrite('imgs/cards_detected.png', image)
-    return cnts
+    new_cnts = []
+    for cnt in cnts:
+        peri = cv2.arcLength(cnt, True)
+        approx_corners = cv2.approxPolyDP(cnt, 0.02 * peri, True)
+        if len(approx_corners) == 4:
+            new_cnts.append(cnt)
+    return new_cnts
     
     
 def create_labeled_cards():
@@ -62,9 +72,9 @@ def create_labeled_cards():
     cnts = detect_cards(image)[:120]
     for i, c in enumerate(cnts):
         peri = cv2.arcLength(c, True)
-        approx = cv2.approxPolyDP(c, 0.02*peri, True)
-        if len(approx) == 4:
-            warped = four_point_transform(image, approx.reshape(4, 2))
+        approx_corners = cv2.approxPolyDP(c, 0.02*peri, True)
+        if len(approx_corners) == 4:
+            warped = four_point_transform(image, approx_corners.reshape(4, 2))
             card = proccess_card(warped)
             cv2.imwrite('data/labeled_2/card_{}.png'.format(i), card)
 
@@ -73,9 +83,9 @@ def create_labeled_corners():
     cnts = detect_cards(image)[:130]
     for i_card, c in enumerate(cnts):
         peri = cv2.arcLength(c, True)
-        approx = cv2.approxPolyDP(c, 0.02 * peri, True)
-        if len(approx) == 4:
-            input_card = four_point_transform(image, approx.reshape(4, 2))
+        approx_corners = cv2.approxPolyDP(c, 0.02 * peri, True)
+        if len(approx_corners) == 4:
+            input_card = four_point_transform(image, approx_corners.reshape(4, 2))
             input_card = proccess_card(input_card)
             cv2.imwrite('data/labeled_top_left/card_{}.png'.format(i_card), input_card[5:90,:35])
     
@@ -96,7 +106,7 @@ def get_labeled_top_left():
     for file in os.listdir(loc):
         if file.endswith('.png'):
             warped = cv2.imread(loc + file)
-            card = proccess_card(warped)
+            card = proccess_top_left(warped)
             labeled[file.split('.')[0]] = card
     return labeled
 
@@ -108,59 +118,89 @@ def calc_difference(image_1, image_2):
     flag, diff = cv2.threshold(diff, 127, 255, cv2.THRESH_BINARY)
     return np.sum(diff)
 
-def top_left_detection(image):
-    '''
-    wip
-    '''
+def top_left_detection_match_template(image):
     labeled = get_labeled_top_left()
-    image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    ret, image = cv2.threshold(image, 127, 255, cv2.THRESH_BINARY)
-    dim = (245, 343)
-    image = cv2.resize(image, dim, interpolation = cv2.INTER_AREA)
-    cv2.imshow('raw', image)
-    return labeled
-    
+    cnts = detect_cards(image)[:15]
+    results = {}
+    for i_card, cnt in enumerate(cnts):
+        peri = cv2.arcLength(cnt, True)
+        approx_corners = cv2.approxPolyDP(cnt, 0.02 * peri, True)
+        input_card = four_point_transform(image, approx_corners.reshape(4, 2))
+        input_card = proccess_card(input_card)
+        matches = {}
+        for label_name, label_card in labeled.items():
+            match_coef = cv2.matchTemplate(input_card, label_card, cv2.TM_CCOEFF)
+            (min_coef, max_coef, minLoc, maxLoc) = cv2.minMaxLoc(match_coef)
+            matches[label_name] = max_coef
+        results[i_card] = max(matches, key=matches.get)
+    return cnts, results
+
+def top_left_detection_abs_diff(image):
+    labeled = get_labeled_top_left()
+    cnts = detect_cards(image)[:30]
+    results = {}
+    for i_card, cnt in enumerate(cnts):
+        peri = cv2.arcLength(cnt, True)
+        approx_corners = cv2.approxPolyDP(cnt, 0.02 * peri, True)
+        input_card = four_point_transform(image, approx_corners.reshape(4, 2))
+        input_card = proccess_card(input_card)
+        input_card = input_card[5:90,:35]
+        diffs = {}
+        for label_name, label_card in labeled.items():
+            diffs[label_name] = calc_difference(input_card, label_card)
+        results[i_card] = min(diffs, key=diffs.get)
+    return cnts, results  
+ 
+def whole_card_detection_abs_diff(image):
+    labeled = get_labeled_cards()
+    cnts = detect_cards(image)[:105]
+    results = {}
+    for i_card, cnt in enumerate(cnts):
+        peri = cv2.arcLength(cnt, True)
+        approx_corners = cv2.approxPolyDP(cnt, 0.02 * peri, True)
+        input_card = four_point_transform(image, approx_corners.reshape(4, 2))
+        input_card = proccess_card(input_card)
+        (h, w) = input_card.shape[:2]
+        center = (w / 2, h / 2)
+        M = cv2.getRotationMatrix2D(center, 180, 1.0)
+        input_card_rotated = cv2.warpAffine(input_card, M, (w, h))
+        diffs = {}
+        for label_name, label_card in labeled.items():
+            diff_1 = calc_difference(input_card, label_card)
+            diff_2 = calc_difference(input_card_rotated, label_card)  
+            diffs[label_name] = min(diff_1, diff_2)
+        results[i_card] = min(diffs, key=diffs.get)
+    return cnts, results
+
 def center_of_contour(cnts):
     M = cv2.moments(cnts)
     cX = int(M['m10'] / M['m00'])
     cY = int(M['m01'] / M['m00'])
     return cX, cY
+
+def draw_results(image, cnts, file_name, results=None):
+    cv2.drawContours(image, cnts, -1, (0, 255, 0), 4)
+    if results:
+        for i_card, card_label in results.items():
+            x, y = center_of_contour(cnts[i_card])
+            cv2.putText(image, card_label, (x-110, y+20), cv2.FONT_HERSHEY_SIMPLEX, 4, (0, 255, 0), 10)
+    cv2.imwrite(file_name, image)
     
-    
-def whole_card_detection(image):
-    labeled = get_labeled_cards()
-    cnts = detect_cards(image)[:105]
-    results = {}
-    for i_card, c in enumerate(cnts):
-        peri = cv2.arcLength(c, True)
-        approx = cv2.approxPolyDP(c, 0.02 * peri, True)
-        if len(approx) == 4:
-            input_card = four_point_transform(image, approx.reshape(4, 2))
-            input_card = proccess_card(input_card)
-            (h, w) = input_card.shape[:2]
-            center = (w / 2, h / 2)
-            M = cv2.getRotationMatrix2D(center, 180, 1.0)
-            input_card_rotated = cv2.warpAffine(input_card, M, (w, h))
-            diffs = {}
-            for label_name, label_card in labeled.items():
-                diff_1 = calc_difference(input_card, label_card)
-                diff_2 = calc_difference(input_card_rotated, label_card)  
-                diffs[label_name] = min(diff_1, diff_2)
-            results[i_card] = min(diffs, key=diffs.get)
-    for i_card, card_label in results.items():
-        x, y = center_of_contour(cnts[i_card])
-        cv2.putText(image, card_label, (x-110, y+20), cv2.FONT_HERSHEY_SIMPLEX, 4, (0, 255, 0), 10)
-    cv2.imwrite('imgs/labeled.png', image)
-    return results
 
 if __name__ == '__main__':
     
+# =============================================================================
+#     image = cv2.imread('data/sample/dealt.jpg')
+#     file_name = 'imgs/messy_cnts.png'
+#     cnts = detect_cards(image)
+#     draw_results(image, cnts[:50], file_name)
+# =============================================================================
     
-    results = whole_card_detection(cv2.imread('data/sample/all_cards.jpg'))
+    image = cv2.imread('data/sample/all_cards.jpg')
+    cnts, results = top_left_detection_match_template(image)
     print(results)
-    
-
-    
+    file_name = 'imgs/messy_cnts.png'
+    draw_results(image, cnts, file_name, results)
     
     
     

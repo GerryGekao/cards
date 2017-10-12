@@ -24,6 +24,13 @@ Learning how to use open computer vision by detecting playing cards on a table w
 #### labeled
 <img src='/imgs/labeled.png'>
 
+#### next steps...
+
+how do you recognize cards that are not all the same and perfectly spread out???
+
+<img src='/imgs/dealt.jpg'>
+
+
 
 
 * get data
@@ -38,7 +45,9 @@ Learning how to use open computer vision by detecting playing cards on a table w
     * https://www.pyimagesearch.com/2015/01/26/multi-scale-template-matching-using-python-opencv/
     * https://machinelearningmastery.com/using-opencv-python-and-template-matching-to-play-wheres-waldo/
     * https://www.pyimagesearch.com/2016/02/01/opencv-center-of-contour/
+    * https://www.pyimagesearch.com/2017/07/17/credit-card-ocr-with-opencv-and-python/
 * done already
     * http://arnab.org/blog/so-i-suck-24-automating-card-games-using-opencv-and-python
     * https://rdmilligan.wordpress.com/2014/07/05/playing-card-detection-using-opencv/
     * https://github.com/EdjeElectronics/OpenCV-Playing-Card-Detector
+    * https://www.youtube.com/watch?v=RgjPcP4HN58
