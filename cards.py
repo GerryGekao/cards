@@ -2,13 +2,18 @@
 
 import numpy as np
 import matplotlib.pyplot as plt
-from cv2 import cv2
+import cv2
 from skimage.filters import threshold_local, threshold_adaptive
 import os
 import warnings
 import time
 
 warnings.filterwarnings("ignore")
+
+'''
+to install opencv simply use
+https://anaconda.org/conda-forge/opencv
+'''
 
 def order_points(pts):
 	rect = np.zeros((4, 2), dtype = "float32")
@@ -71,9 +76,17 @@ def new_detect_cards(image):
     gray_blur = cv2.GaussianBlur(gray, (5, 5), 0)
     retval, thresh = cv2.threshold(gray_blur, 127, 255, cv2.THRESH_BINARY)
     edged = cv2.Canny(thresh, 70, 200)
+    cv2.imwrite('imgs/new_detect_edged.png', edged)
     (_, cnts, _) = cv2.findContours(edged, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
     cnts = sorted(cnts, key = cv2.contourArea, reverse = True)
-    return cnts
+    new_cnts = []
+    corners = []
+    for cnt in cnts:
+        peri = cv2.arcLength(cnt, True)
+        approx_corners = cv2.approxPolyDP(cnt, 0.01 * peri, True)
+        new_cnts.append(cnt)
+        corners.append(approx_corners)
+    return new_cnts, corners
     
 def create_labeled_cards():
     image = cv2.imread('data/sample/all_cards.jpg')
@@ -186,23 +199,36 @@ def center_of_contour(cnts):
     cY = int(M['m01'] / M['m00'])
     return cX, cY
 
-def draw_results(image, cnts, file_name, results=None):
+def draw_results(image, cnts, file_name, results=None, corners=None):
     cv2.drawContours(image, cnts, -1, (0, 255, 0), 4)
     if results:
         for i_card, card_label in results.items():
             x, y = center_of_contour(cnts[i_card])
             cv2.putText(image, card_label, (x-110, y+20), cv2.FONT_HERSHEY_SIMPLEX, 4, (0, 255, 0), 10)
+    if corners:
+        for corner in corners:
+            for point in corner.reshape(corner.shape[0],2):
+                cv2.circle(image, tuple(point), 7, (255, 255, 255), -1)
     cv2.imwrite(file_name, image)
+    
+def live_webcam():
+    pass
     
 
 if __name__ == '__main__':    
     
-# =============================================================================
-#     image = cv2.imread('data/sample/dealt.jpg')
-#     file_name = 'imgs/messy_cnts.png'
-#     cnts = detect_cards(image)
-#     draw_results(image, cnts[:50], file_name)
-# =============================================================================
+    
+    
+    image = cv2.imread('data/sample/dealt.jpg')
+    file_name = 'imgs/new_detect_cards.png'
+    cnts, corners = new_detect_cards(image)
+    for corner in corners:
+        for point in corner.reshape(corner.shape[0],2):
+            cv2.circle(image, tuple(point), 7, (255, 255, 255), -1)
+    cv2.imwrite('imgs/corners.png', image)
+    
+    
+    draw_results(image, cnts, file_name)
     
 # =============================================================================
 #     image = cv2.imread('data/sample/all_cards.jpg')
