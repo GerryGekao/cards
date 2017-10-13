@@ -65,7 +65,15 @@ def detect_cards(image):
         if len(approx_corners) == 4:
             new_cnts.append(cnt)
     return new_cnts
-    
+
+def new_detect_cards(image):
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    gray_blur = cv2.GaussianBlur(gray, (5, 5), 0)
+    retval, thresh = cv2.threshold(gray_blur, 127, 255, cv2.THRESH_BINARY)
+    edged = cv2.Canny(thresh, 70, 200)
+    (_, cnts, _) = cv2.findContours(edged, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+    cnts = sorted(cnts, key = cv2.contourArea, reverse = True)
+    return cnts
     
 def create_labeled_cards():
     image = cv2.imread('data/sample/all_cards.jpg')
@@ -187,7 +195,7 @@ def draw_results(image, cnts, file_name, results=None):
     cv2.imwrite(file_name, image)
     
 
-if __name__ == '__main__':
+if __name__ == '__main__':    
     
 # =============================================================================
 #     image = cv2.imread('data/sample/dealt.jpg')
@@ -196,11 +204,13 @@ if __name__ == '__main__':
 #     draw_results(image, cnts[:50], file_name)
 # =============================================================================
     
-    image = cv2.imread('data/sample/all_cards.jpg')
-    cnts, results = top_left_detection_match_template(image)
-    print(results)
-    file_name = 'imgs/messy_cnts.png'
-    draw_results(image, cnts, file_name, results)
+# =============================================================================
+#     image = cv2.imread('data/sample/all_cards.jpg')
+#     cnts, results = top_left_detection_match_template(image)
+#     print(results)
+#     file_name = 'imgs/messy_cnts.png'
+#     draw_results(image, cnts, file_name, results)
+# =============================================================================
     
     
     

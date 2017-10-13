@@ -51,3 +51,4 @@ how do you recognize cards that are not all the same and perfectly spread out???
     * https://rdmilligan.wordpress.com/2014/07/05/playing-card-detection-using-opencv/
     * https://github.com/EdjeElectronics/OpenCV-Playing-Card-Detector
     * https://www.youtube.com/watch?v=RgjPcP4HN58
+    * https://www.youtube.com/watch?v=MHM0-zkwNsg&feature=youtu.be
